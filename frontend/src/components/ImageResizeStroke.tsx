@@ -338,9 +338,6 @@ export default function ImageResizeStroke() {
               >
                 {t('imgOneClickProcess')}
               </Button>
-              <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
-                {t('imgOneClickHint')}
-              </Text>
             </div>
             <div>
               <Button
@@ -353,9 +350,6 @@ export default function ImageResizeStroke() {
               >
                 {t('imgOneClickAllActionsProcess')}
               </Button>
-              <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
-                {t('imgOneClickAllActionsHint')}
-              </Text>
             </div>
           </Space>
         </div>
