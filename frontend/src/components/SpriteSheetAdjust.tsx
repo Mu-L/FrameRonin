@@ -111,7 +111,7 @@ async function recombineFrames(
   frameOffsets: FrameOffset[],
   cols: number,
   rows: number
-): Promise<string> {
+): Promise<{ url: string; cellW: number; cellH: number }> {
   if (frameUrls.length === 0) throw new Error('No frames')
   const firstImg = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
@@ -145,9 +145,9 @@ async function recombineFrames(
     tctx.drawImage(img, 0, 0, cellW, cellH, dx, dy, cellW, cellH)
     ctx.drawImage(tmp, 0, 0, cellW, cellH, c * cellW, r * cellH, cellW, cellH)
   }
-  return new Promise((resolve, reject) => {
+  return new Promise<{ url: string; cellW: number; cellH: number }>((resolve, reject) => {
     out.toBlob((b) => {
-      if (b) resolve(URL.createObjectURL(b))
+      if (b) resolve({ url: URL.createObjectURL(b), cellW, cellH })
       else reject(new Error('toBlob failed'))
     }, 'image/png')
   })
@@ -233,7 +233,11 @@ export default function SpriteSheetAdjust() {
       setPreviewImgSize(null)
       setFrameOffsets([])
       setFramePressCounts([])
-      setRecombinedUrl(null)
+      setRecombinedUrl((old) => {
+        if (old) URL.revokeObjectURL(old)
+        return null
+      })
+      setRecombinedParams(null)
       setFixedPixelMode(false)
       setFixedPixelFixes([])
       setFrameUrls(resolved)
@@ -244,16 +248,22 @@ export default function SpriteSheetAdjust() {
   }, [originalUrl, file, cols, rows])
 
   const [recombinedUrl, setRecombinedUrl] = useState<string | null>(null)
+  const [recombinedParams, setRecombinedParams] = useState<{ cellW: number; cellH: number } | null>(null)
   const [recombining, setRecombining] = useState(false)
   const [applyProgress, setApplyProgress] = useState<number | null>(null)
 
   const handleRecombine = async () => {
     if (frameUrls.length === 0) return
     setRecombining(true)
-    setRecombinedUrl(null)
+    setRecombinedUrl((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return null
+    })
+    setRecombinedParams(null)
     try {
-      const url = await recombineFrames(frameUrls, frameOffsets, cols, rows)
+      const { url, cellW, cellH } = await recombineFrames(frameUrls, frameOffsets, cols, rows)
       setRecombinedUrl(url)
+      setRecombinedParams({ cellW, cellH })
     } finally {
       setRecombining(false)
     }
@@ -479,7 +489,11 @@ export default function SpriteSheetAdjust() {
                 {recombinedUrl && (
                   <a
                     href={recombinedUrl}
-                    download="recombined-sprite.png"
+                    download={
+                      recombinedParams
+                        ? `recombined_${cols}x${rows}_${recombinedParams.cellW}x${recombinedParams.cellH}_${cols * recombinedParams.cellW}x${rows * recombinedParams.cellH}.png`
+                        : 'recombined-sprite.png'
+                    }
                     style={{
                       padding: '10px 24px',
                       border: '1px solid #9a8b78',
@@ -645,7 +659,11 @@ export default function SpriteSheetAdjust() {
                   {recombinedUrl && (
                     <a
                       href={recombinedUrl}
-                      download="recombined-sprite.png"
+                      download={
+                        recombinedParams
+                          ? `recombined_${cols}x${rows}_${recombinedParams.cellW}x${recombinedParams.cellH}_${cols * recombinedParams.cellW}x${rows * recombinedParams.cellH}.png`
+                          : 'recombined-sprite.png'
+                      }
                       style={{
                         padding: '8px 20px',
                         border: '1px solid #9a8b78',
@@ -801,6 +819,8 @@ export default function SpriteSheetAdjust() {
                               display: 'inline-block',
                               width: previewImgSize ? previewImgSize.w * previewZoom : undefined,
                               height: previewImgSize ? previewImgSize.h * previewZoom : undefined,
+                              border: '1px solid rgba(154,139,120,0.9)',
+                              boxSizing: 'border-box',
                             }}
                           >
                             <ShiftedFrameCanvas
@@ -811,8 +831,74 @@ export default function SpriteSheetAdjust() {
                               displayWidth={previewImgSize ? previewImgSize.w * previewZoom : undefined}
                               displayHeight={previewImgSize ? previewImgSize.h * previewZoom : undefined}
                               onSize={(w, h) => setPreviewImgSize({ w, h })}
-                              style={{ display: 'block' }}
+                              style={{ display: 'block', position: 'relative', zIndex: 1 }}
                             />
+                            {/* 背景网格线：每 2 像素一格，叠加在图上以辅助对齐 */}
+                            {previewImgSize && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  backgroundImage: `
+                                    linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
+                                    linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)
+                                  `,
+                                  backgroundSize: `${2 * previewZoom}px ${2 * previewZoom}px`,
+                                  pointerEvents: 'none',
+                                  zIndex: 2,
+                                }}
+                              />
+                            )}
+                            {/* 水平、垂直参考中线 */}
+                            {previewImgSize && (
+                              <>
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    right: 0,
+                                    top: '50%',
+                                    height: 1,
+                                    background: 'rgba(181,82,51,0.75)',
+                                    transform: 'translateY(-50%)',
+                                    pointerEvents: 'none',
+                                    zIndex: 3,
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    left: '50%',
+                                    top: 0,
+                                    bottom: 0,
+                                    width: 1,
+                                    background: 'rgba(181,82,51,0.75)',
+                                    transform: 'translateX(-50%)',
+                                    pointerEvents: 'none',
+                                    zIndex: 3,
+                                  }}
+                                />
+                              </>
+                            )}
+                            {/* 分辨率显示 */}
+                            {previewImgSize && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  left: 4,
+                                  bottom: 4,
+                                  padding: '2px 6px',
+                                  background: 'rgba(0,0,0,0.5)',
+                                  color: '#fff',
+                                  fontSize: 11,
+                                  borderRadius: 4,
+                                  pointerEvents: 'none',
+                                  zIndex: 4,
+                                }}
+                              >
+                                {previewImgSize.w} × {previewImgSize.h}
+                              </div>
+                            )}
                             {fixedPixelFixes.map((fix, idx) => (
                               <div
                                 key={idx}
@@ -826,6 +912,7 @@ export default function SpriteSheetAdjust() {
                                   border: '2px solid #b55233',
                                   boxSizing: 'border-box',
                                   pointerEvents: 'none',
+                                  zIndex: 5,
                                 }}
                               />
                             ))}
@@ -977,7 +1064,11 @@ export default function SpriteSheetAdjust() {
                     {recombinedUrl && (
                       <a
                         href={recombinedUrl}
-                        download="recombined-sprite.png"
+                        download={
+                          recombinedParams
+                            ? `recombined_${cols}x${rows}_${recombinedParams.cellW}x${recombinedParams.cellH}_${cols * recombinedParams.cellW}x${rows * recombinedParams.cellH}.png`
+                            : 'recombined-sprite.png'
+                        }
                         style={{
                           padding: '8px 20px',
                           border: '1px solid #9a8b78',

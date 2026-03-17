@@ -223,6 +223,16 @@ export default function GifFrameConverter() {
   const [splitRows, setSplitRows] = useState(2)
   const [splitCols, setSplitCols] = useState(2)
   const [combinedUrl, setCombinedUrl] = useState<string | null>(null)
+  const [combinedParams, setCombinedParams] = useState<{
+    cols: number
+    rows: number
+    outW: number
+    outH: number
+    cropTop: number
+    cropBottom: number
+    cropLeft: number
+    cropRight: number
+  } | null>(null)
   const [cropTop, setCropTop] = useState(0)
   const [cropBottom, setCropBottom] = useState(0)
   const [cropLeft, setCropLeft] = useState(0)
@@ -232,7 +242,7 @@ export default function GifFrameConverter() {
 
   const [stitchFiles, setStitchFiles] = useState<File[]>([])
   const [stitchInputUrls, setStitchInputUrls] = useState<string[]>([])
-  const [stitchDirection, setStitchDirection] = useState<'vertical' | 'horizontal'>('vertical')
+  const [stitchDirection, setStitchDirection] = useState<'vertical' | 'horizontal' | 'overlay'>('vertical')
   const [stitchResultUrl, setStitchResultUrl] = useState<string | null>(null)
 
   const revokeExtractedPreviews = () => {
@@ -372,12 +382,13 @@ export default function GifFrameConverter() {
       if (old) URL.revokeObjectURL(old)
       return null
     })
+    setCombinedParams(null)
     try {
       const imgs: HTMLImageElement[] = []
-      const top = Math.max(0, cropTop)
-      const bottom = Math.max(0, cropBottom)
-      const left = Math.max(0, cropLeft)
-      const right = Math.max(0, cropRight)
+      const top = cropTop
+      const bottom = cropBottom
+      const left = cropLeft
+      const right = cropRight
       let maxW = 0
       let maxH = 0
       for (const f of combineFiles) {
@@ -389,6 +400,7 @@ export default function GifFrameConverter() {
           i.src = url
         })
         URL.revokeObjectURL(url)
+        // 正数=裁切，负数=扩边（增加透明像素）
         const sw = Math.max(1, img.naturalWidth - left - right)
         const sh = Math.max(1, img.naturalHeight - top - bottom)
         maxW = Math.max(maxW, sw)
@@ -412,12 +424,30 @@ export default function GifFrameConverter() {
         const c = i % cols
         const dx = c * maxW + (maxW - sw) / 2
         const dy = r * maxH + (maxH - sh) / 2
-        ctx.drawImage(img, left, top, sw, sh, dx, dy, sw, sh)
+        // 正数=从边缘裁切，负数=扩边时源区从 (0,0) 开始，目标偏移
+        const sx = Math.max(0, left)
+        const sy = Math.max(0, top)
+        const srcW = Math.max(1, img.naturalWidth - Math.max(0, left) - Math.max(0, right))
+        const srcH = Math.max(1, img.naturalHeight - Math.max(0, top) - Math.max(0, bottom))
+        const offsetX = Math.max(0, -left)
+        const offsetY = Math.max(0, -top)
+        // 始终按 1:1 绘制，避免拉伸变形。sw/sh 为格子尺寸（含扩边），实际绘制用 srcW/srcH
+        ctx.drawImage(img, sx, sy, srcW, srcH, dx + offsetX, dy + offsetY, srcW, srcH)
       }
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('canvas'))), 'image/png')
       })
       setCombinedUrl(URL.createObjectURL(blob))
+      setCombinedParams({
+        cols,
+        rows,
+        outW,
+        outH,
+        cropTop: top,
+        cropBottom: bottom,
+        cropLeft: left,
+        cropRight: right,
+      })
       message.success(t('imagesToSingleSuccess'))
     } catch (e) {
       message.error(t('imagesToSingleFailed') + ': ' + String(e))
@@ -430,7 +460,11 @@ export default function GifFrameConverter() {
     if (!combinedUrl) return
     const a = document.createElement('a')
     a.href = combinedUrl
-    a.download = 'combined.png'
+    const p = combinedParams
+    const name = p
+      ? `combined_${p.cols}x${p.rows}_${p.outW}x${p.outH}_T${p.cropTop}B${p.cropBottom}L${p.cropLeft}R${p.cropRight}.png`
+      : 'combined.png'
+    a.download = name
     a.click()
   }
 
@@ -627,9 +661,13 @@ export default function GifFrameConverter() {
         imgs.push(img)
       }
       const isVertical = stitchDirection === 'vertical'
+      const isOverlay = stitchDirection === 'overlay'
       let outW: number
       let outH: number
-      if (isVertical) {
+      if (isOverlay) {
+        outW = Math.max(...imgs.map((i) => i.naturalWidth))
+        outH = Math.max(...imgs.map((i) => i.naturalHeight))
+      } else if (isVertical) {
         outW = Math.max(...imgs.map((i) => i.naturalWidth))
         outH = imgs.reduce((s, i) => s + i.naturalHeight, 0)
       } else {
@@ -646,7 +684,11 @@ export default function GifFrameConverter() {
         const img = imgs[i]!
         const w = img.naturalWidth
         const h = img.naturalHeight
-        if (isVertical) {
+        if (isOverlay) {
+          dx = (outW - w) / 2
+          dy = (outH - h) / 2
+          ctx.drawImage(img, 0, 0, w, h, dx, dy, w, h)
+        } else if (isVertical) {
           dx = (outW - w) / 2
           ctx.drawImage(img, 0, 0, w, h, dx, dy, w, h)
           dy += h
@@ -998,6 +1040,7 @@ export default function GifFrameConverter() {
                             }}
                             onImageSize={cropPreviewIndex === 0 ? (w, h) => setFirstImageSize({ w, h }) : undefined}
                             loadingText={t('cropPreviewLoading')}
+                            allowNegative
                           />
                           <Button
                             type="text"
@@ -1012,19 +1055,22 @@ export default function GifFrameConverter() {
                             {t('imagesToSingleCropPreviewN', { current: cropPreviewIndex + 1, total: combineFiles.length })}
                           </Text>
                         )}
+                        {(cropTop < 0 || cropBottom < 0 || cropLeft < 0 || cropRight < 0) && (
+                          <Text type="secondary" style={{ fontSize: 12 }}>{t('imagesToSingleCropNegativeHint')}</Text>
+                        )}
                       </div>
                       <div style={{ alignSelf: 'center', display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <Space wrap align="center">
-                          <InputNumber min={0} value={cropTop} onChange={(v) => setCropTop(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropTop')} />
-                          <InputNumber min={0} value={cropBottom} onChange={(v) => setCropBottom(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropBottom')} />
-                          <InputNumber min={0} value={cropLeft} onChange={(v) => setCropLeft(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropLeft')} />
-                          <InputNumber min={0} value={cropRight} onChange={(v) => setCropRight(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropRight')} />
+                          <InputNumber min={-999} value={cropTop} onChange={(v) => setCropTop(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropTop')} />
+                          <InputNumber min={-999} value={cropBottom} onChange={(v) => setCropBottom(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropBottom')} />
+                          <InputNumber min={-999} value={cropLeft} onChange={(v) => setCropLeft(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropLeft')} />
+                          <InputNumber min={-999} value={cropRight} onChange={(v) => setCropRight(v ?? 0)} style={{ width: 64 }} addonBefore={t('batchCropRight')} />
                         </Space>
                         {firstImageSize && (
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {t('imagesToSingleCropRemaining', {
-                              w: Math.max(0, firstImageSize.w - cropLeft - cropRight),
-                              h: Math.max(0, firstImageSize.h - cropTop - cropBottom),
+                              w: Math.max(1, firstImageSize.w - cropLeft - cropRight),
+                              h: Math.max(1, firstImageSize.h - cropTop - cropBottom),
                             })}
                           </Text>
                         )}
@@ -1177,14 +1223,30 @@ export default function GifFrameConverter() {
                     </div>
                   </>
                 )}
-                <Space style={{ marginTop: 16 }}>
+                <Space wrap style={{ marginTop: 16 }} align="center">
                   <Button type="primary" loading={loading} onClick={runImagesToSingle} disabled={combineFiles.length === 0}>
                     {loading ? t('imagesToSingleCombining') : t('imagesToSingleCombine')}
                   </Button>
                   {combinedUrl && (
-                    <Button icon={<DownloadOutlined />} onClick={downloadCombined}>
-                      {t('imagesToSingleDownload')}
-                    </Button>
+                    <>
+                      <Button icon={<DownloadOutlined />} onClick={downloadCombined}>
+                        {t('imagesToSingleDownload')}
+                      </Button>
+                      {combinedParams && (
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {t('imagesToSingleParams', {
+                            cols: combinedParams.cols,
+                            rows: combinedParams.rows,
+                            w: combinedParams.outW,
+                            h: combinedParams.outH,
+                            t: combinedParams.cropTop,
+                            b: combinedParams.cropBottom,
+                            l: combinedParams.cropLeft,
+                            r: combinedParams.cropRight,
+                          })}
+                        </Text>
+                      )}
+                    </>
                   )}
                 </Space>
                 {combinedUrl && (
@@ -1230,6 +1292,7 @@ export default function GifFrameConverter() {
                   >
                     <Radio.Button value="vertical">{t('simpleStitchVertical')}</Radio.Button>
                     <Radio.Button value="horizontal">{t('simpleStitchHorizontal')}</Radio.Button>
+                    <Radio.Button value="overlay">{t('simpleStitchOverlay')}</Radio.Button>
                   </Radio.Group>
                 </Space>
                 <StashDropZone onStashDrop={(f) => setStitchFiles((prev) => [...prev, f])}>

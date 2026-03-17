@@ -53,7 +53,10 @@ export default function ImageGeminiWatermark() {
   const processImage = async () => {
     if (!imageUrl || !file) return
     setProcessing(true)
-    setResultUrl(null)
+    setResultUrl((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return null
+    })
     try {
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const i = new Image()

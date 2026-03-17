@@ -87,21 +87,33 @@ export function ImageStashProvider({ children }: { children: React.ReactNode }) 
   const addImage = useCallback(
     async (url: string, name?: string) => {
       const id = `${idSeed}-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      const persistUrl =
-        isConnected && url.startsWith('blob:')
-          ? await urlToDataUrl(url).catch(() => url)
-          : url
+      let persistUrl: string
+      if (isConnected && url.startsWith('blob:')) {
+        persistUrl = await urlToDataUrl(url).catch(() => url)
+        if (persistUrl !== url) URL.revokeObjectURL(url)
+      } else {
+        persistUrl = url
+      }
       setItems((prev) => [...prev, { id, url: persistUrl, name }])
     },
     [idSeed, isConnected]
   )
 
   const removeImage = useCallback((id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id))
+    setItems((prev) => {
+      const item = prev.find((i) => i.id === id)
+      if (item?.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
+      return prev.filter((i) => i.id !== id)
+    })
   }, [])
 
   const clearAll = useCallback(() => {
-    setItems([])
+    setItems((prev) => {
+      prev.forEach((i) => {
+        if (i.url.startsWith('blob:')) URL.revokeObjectURL(i.url)
+      })
+      return []
+    })
   }, [])
 
   return (

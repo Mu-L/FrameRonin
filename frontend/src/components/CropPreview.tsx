@@ -17,6 +17,8 @@ interface CropPreviewProps {
   onChange: (crop: CropValues) => void
   onImageSize?: (w: number, h: number) => void
   loadingText?: string
+  /** 允许负值（扩边），并显示裁切框与扩边区域 */
+  allowNegative?: boolean
 }
 
 export default function CropPreview({
@@ -28,6 +30,7 @@ export default function CropPreview({
   onChange,
   onImageSize,
   loadingText = 'Loading...',
+  allowNegative = false,
 }: CropPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
@@ -66,9 +69,12 @@ export default function CropPreview({
     return { dx, dy, dw, dh, scale, cw, ch }
   }, [imgSize])
 
+  const hasNegative = allowNegative && (cropLeft < 0 || cropRight < 0 || cropTop < 0 || cropBottom < 0)
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, handle: DragHandle) => {
       e.preventDefault()
+      if (hasNegative) return
       const rect = getDisplayRect()
       if (!rect || !imgSize) return
       const { scale } = rect
@@ -83,7 +89,7 @@ export default function CropPreview({
         scale,
       })
     },
-    [cropTop, cropBottom, cropLeft, cropRight, getDisplayRect, imgSize]
+    [cropTop, cropBottom, cropLeft, cropRight, getDisplayRect, imgSize, hasNegative]
   )
 
   useEffect(() => {
@@ -175,11 +181,210 @@ export default function CropPreview({
 
   const rect = getDisplayRect()
   if (!rect) return null
-  const { dx, dy, dw, dh, scale, cw, ch } = rect
-  const boxL = dx + cropLeft * scale
-  const boxT = dy + cropTop * scale
+  const { scale, cw, ch } = rect
+  const dw = cw
+  const dh = ch
+  const boxL = cropLeft * scale
+  const boxT = cropTop * scale
   const boxW = (imgSize.w - cropLeft - cropRight) * scale
   const boxH = (imgSize.h - cropTop - cropBottom) * scale
+
+  if (hasNegative) {
+    const left = Math.min(0, boxL)
+    const topVal = Math.min(0, boxT)
+    const right = Math.max(cw, boxL + boxW)
+    const bottom = Math.max(ch, boxT + boxH)
+    const containerW = right - left
+    const containerH = bottom - topVal
+    const offsetX = -left
+    const offsetY = -topVal
+    const imgLeft = offsetX
+    const imgTop = offsetY
+    const boxLeft = boxL + offsetX
+    const boxTop = boxT + offsetY
+    const negScale = Math.min(1, PREVIEW_MAX / Math.max(containerW, containerH))
+    const displayW = containerW * negScale
+    const displayH = containerH * negScale
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          position: 'relative',
+          width: displayW,
+          height: displayH,
+          minWidth: 120,
+          minHeight: 120,
+          flexShrink: 0,
+          overflow: 'hidden',
+          borderRadius: 8,
+          border: '1px solid #9a8b78',
+          background: 'repeating-conic-gradient(#c9bfb0 0% 25%, #e4dbcf 0% 50%) 50% / 16px 16px',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: containerW,
+            height: containerH,
+            transform: `scale(${negScale})`,
+            transformOrigin: 'top left',
+          }}
+        >
+          <img
+            src={imageUrl}
+            alt=""
+            style={{
+              position: 'absolute',
+              left: imgLeft,
+              top: imgTop,
+              width: dw,
+              height: dh,
+              objectFit: 'none',
+              objectPosition: '0 0',
+              pointerEvents: 'none',
+            }}
+          />
+          {/* 扩边区域（半透明蓝） */}
+          {boxL < 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                left: boxLeft,
+                top: boxTop,
+                width: -boxL,
+                height: boxH,
+                background: 'rgba(0, 100, 255, 0.2)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {boxL + boxW > cw && (
+            <div
+              style={{
+                position: 'absolute',
+                left: imgLeft + cw,
+                top: boxTop,
+                width: boxL + boxW - cw,
+                height: boxH,
+                background: 'rgba(0, 100, 255, 0.2)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {boxT < 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                left: boxLeft,
+                top: boxTop,
+                width: boxW,
+                height: -boxT,
+                background: 'rgba(0, 100, 255, 0.2)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {boxT + boxH > ch && (
+            <div
+              style={{
+                position: 'absolute',
+                left: boxLeft,
+                top: imgTop + ch,
+                width: boxW,
+                height: boxT + boxH - ch,
+                background: 'rgba(0, 100, 255, 0.2)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {/* 裁切区域（暗色遮罩） */}
+          {boxL > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                left: imgLeft,
+                top: imgTop,
+                width: boxL,
+                height: dh,
+                background: 'rgba(0,0,0,0.5)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {boxL + boxW < cw && (
+            <div
+              style={{
+                position: 'absolute',
+                left: imgLeft + boxL + boxW,
+                top: imgTop,
+                width: cw - boxL - boxW,
+                height: dh,
+                background: 'rgba(0,0,0,0.5)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {boxT > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                left: imgLeft,
+                top: imgTop,
+                width: dw,
+                height: boxT,
+                background: 'rgba(0,0,0,0.5)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {boxT + boxH < ch && (
+            <div
+              style={{
+                position: 'absolute',
+                left: imgLeft,
+                top: imgTop + boxT + boxH,
+                width: dw,
+                height: ch - boxT - boxH,
+                background: 'rgba(0,0,0,0.5)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          {/* 输出框边框 */}
+          <div
+            style={{
+              position: 'absolute',
+              left: boxLeft,
+              top: boxTop,
+              width: boxW,
+              height: boxH,
+              border: '1px dashed rgba(255,255,255,0.95)',
+              boxSizing: 'border-box',
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.25)',
+              pointerEvents: 'none',
+              zIndex: 5,
+            }}
+          />
+          {/* 图片范围边框 */}
+          <div
+            style={{
+              position: 'absolute',
+              left: imgLeft,
+              top: imgTop,
+              width: dw,
+              height: dh,
+              border: '1px solid rgba(255,165,0,0.8)',
+              boxSizing: 'border-box',
+              pointerEvents: 'none',
+              zIndex: 4,
+            }}
+          />
+        </div>
+      </div>
+    )
+  }
 
   const handleStyle: React.CSSProperties = {
     position: 'absolute',

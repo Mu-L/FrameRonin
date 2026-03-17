@@ -260,6 +260,11 @@
   color: #b55233;
 }
 
+.app-footer-gem-token {
+  color: #6b5d4d;
+  font-variant-numeric: tabular-nums;
+}
+
 .app-footer-avatar {
   width: 28px;
   height: 28px;
