@@ -127,7 +127,7 @@ export const locales: Record<Lang, Record<string, string>> = {
     imgOneClickHint: '去水印 → 左上角抠图(容差80/羽化5) → 144×144硬缩放 → RPGMAKER生成',
     imgOneClickSuccess: '一键处理完成',
     imgOneClickAllActionsProcess: '一图全动作处理',
-    imgOneClickAllActionsHint: '去水印 → 256×256硬缩放 → 左上角去背(容差80) → 右/下各裁4px → 252×252',
+    imgOneClickAllActionsHint: '去水印 → 256×256硬缩放 → 左上角连通域去背(容差80) → 右/下各裁4px → 252×252',
     imgOneClickAllActionsSuccess: '一图全动作处理完成',
     imgOriginalSize: '原图尺寸',
     imgOriginalPreview: '原图预览',

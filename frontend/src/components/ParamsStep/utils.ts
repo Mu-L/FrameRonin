@@ -445,6 +445,97 @@ export function applyChromaKey(
   })
 }
 
+/**
+ * 基于左上角(0,0)像素的连通域去背：仅移除与第一行第一像素连通的同色区域，
+ * 不会移除图像中间孤立的同色像素。
+ */
+export function applyChromaKeyContiguousFromTopLeft(
+  dataUrl: string,
+  bgR: number,
+  bgG: number,
+  bgB: number,
+  tolerance: number,
+  feather: number
+): Promise<{ blob: Blob; dataUrl: string }> {
+  void feather // 保留参数与 applyChromaKey 一致
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return reject(new Error('ERR_CANVAS_CREATE'))
+      ctx.drawImage(img, 0, 0)
+      const id = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const d = id.data
+      const w = canvas.width
+      const h = canvas.height
+
+      const idx = (x: number, y: number) => (y * w + x) * 4
+      const dist = (i: number) =>
+        Math.sqrt(
+          (d[i]! - bgR) ** 2 + (d[i + 1]! - bgG) ** 2 + (d[i + 2]! - bgB) ** 2
+        )
+      const match = (i: number) => dist(i) <= tolerance
+
+      const toRemove = new Set<number>()
+      const start = idx(0, 0)
+      if (!match(start)) {
+        ctx.putImageData(id, 0, 0)
+        canvas.toBlob(
+          (blob) =>
+            blob
+              ? resolve({ blob, dataUrl: canvas.toDataURL('image/png') })
+              : reject(new Error('ERR_EXPORT')),
+          'image/png',
+          0.95
+        )
+        return
+      }
+
+      const stack: [number, number][] = [[0, 0]]
+      toRemove.add(idx(0, 0))
+      const vis = new Set<number>()
+      vis.add(idx(0, 0))
+      const dx = [0, 1, 0, -1]
+      const dy = [-1, 0, 1, 0]
+      while (stack.length > 0) {
+        const [x, y] = stack.pop()!
+        for (let k = 0; k < 4; k++) {
+          const nx = x + dx[k]!
+          const ny = y + dy[k]!
+          if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue
+          const i = idx(nx, ny)
+          if (vis.has(i)) continue
+          vis.add(i)
+          if (match(i)) {
+            toRemove.add(i)
+            stack.push([nx, ny])
+          }
+        }
+      }
+
+      for (const i of toRemove) {
+        d[i + 3] = 0
+      }
+      ctx.putImageData(id, 0, 0)
+      const resultDataUrl = canvas.toDataURL('image/png')
+      canvas.toBlob(
+        (blob) =>
+          blob
+            ? resolve({ blob, dataUrl: resultDataUrl })
+            : reject(new Error('ERR_EXPORT')),
+        'image/png',
+        0.95
+      )
+    }
+    img.onerror = () => reject(new Error('ERR_IMAGE_LOAD'))
+    img.src = dataUrl
+  })
+}
+
 export function imageFingerprint(dataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()

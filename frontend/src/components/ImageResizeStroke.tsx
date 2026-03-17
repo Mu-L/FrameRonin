@@ -10,6 +10,7 @@ import StashableImage from './StashableImage'
 import StashDropZone from './StashDropZone'
 import {
   applyChromaKey,
+  applyChromaKeyContiguousFromTopLeft,
   applyInnerStroke,
   cropImageBlob,
   extendImageBottom,
@@ -271,7 +272,7 @@ export default function ImageResizeStroke() {
         r2.onerror = () => reject(new Error('ERR_READ'))
         r2.readAsDataURL(blob)
       })
-      const { dataUrl: matteDataUrl } = await applyChromaKey(dataUrl, r, g, b, 80, 5)
+      const { dataUrl: matteDataUrl } = await applyChromaKeyContiguousFromTopLeft(dataUrl, r, g, b, 80, 5)
       blob = await fetch(matteDataUrl).then((res) => res.blob())
       blob = await cropImageBlob(blob, { left: 0, top: 0, right: 4, bottom: 4 })
       setPreviewBlob(blob)
