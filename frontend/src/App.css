@@ -234,6 +234,25 @@
   margin-bottom: 8px;
 }
 
+.app-footer-ronin-support {
+  font-size: 12px;
+  color: #6b5d4d;
+}
+
+.app-footer-ronin-address {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.app-footer-ronin-copy {
+  cursor: pointer;
+}
+
+.app-footer-ronin-copy:hover {
+  text-decoration: underline;
+}
+
 .app-footer-sep {
   margin: 0 8px;
   opacity: 0.6;

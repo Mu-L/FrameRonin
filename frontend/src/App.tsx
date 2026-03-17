@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from 'react'
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { App as AntdApp, Button, Card, ConfigProvider, Layout, Spin, Steps } from 'antd'
+import { App as AntdApp, Button, Card, ConfigProvider, Layout, message, Spin, Steps } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import enUS from 'antd/locale/en_US'
 import jaJP from 'antd/locale/ja_JP'
@@ -22,6 +22,7 @@ import SpriteSheetAdjust from './components/SpriteSheetAdjust'
 import ImageGeminiWatermark from './components/ImageGeminiWatermark'
 import NanobananaFullChar from './components/NanobananaFullChar'
 import SeedanceWatermarkRemover from './components/SeedanceWatermarkRemover'
+import AssetsAndSourceShare from './components/AssetsAndSourceShare'
 
 const ImageMatte = lazy(() => import('./components/ImageMatte'))
 import ParamsStep from './components/ParamsStep'
@@ -290,6 +291,19 @@ function App() {
               </div>
               <SeedanceWatermarkRemover />
             </Card>
+          ) : mode === 'assetsAndSource' ? (
+            <Card>
+              <div style={{ marginBottom: 16 }}>
+                <Button
+                  type="text"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={() => setMode(null)}
+                >
+                  {t('backToHome')}
+                </Button>
+              </div>
+              <AssetsAndSourceShare />
+            </Card>
           ) : (
             <>
               <Steps
@@ -346,6 +360,21 @@ function App() {
               <span className="app-footer-sep">·</span>
               <span className="app-footer-gem-token" title={t('footerGemTokenTitle')}>
                 {t('footerGemToken')}: {gemToken}
+              </span>
+            </div>
+            <div className="app-footer-ronin-support">
+              {t('footerRoninSupport')}:{' '}
+              <span
+                role="button"
+                tabIndex={0}
+                className="app-footer-source app-footer-ronin-address app-footer-ronin-copy"
+                onClick={() => {
+                  navigator.clipboard.writeText('0xFe15f8251949E3Ce6A311b49a180588b65c8e80C')
+                  message.success(t('footerRoninCopySuccess'))
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLSpanElement).click()}
+              >
+                0xFe15f8251949E3Ce6A311b49a180588b65c8e80C
               </span>
             </div>
           </div>

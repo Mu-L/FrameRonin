@@ -1,5 +1,5 @@
 import { Card, Row, Col, Typography } from 'antd'
-import { ArrowsAltOutlined, BlockOutlined, FileImageOutlined, PictureOutlined, VideoCameraOutlined, ThunderboltOutlined, BorderOuterOutlined, ScissorOutlined, SafetyOutlined } from '@ant-design/icons'
+import { ArrowsAltOutlined, BlockOutlined, FileImageOutlined, PictureOutlined, VideoCameraOutlined, ThunderboltOutlined, BorderOuterOutlined, ScissorOutlined, SafetyOutlined, ShareAltOutlined } from '@ant-design/icons'
 import { useAuth } from '../auth/context'
 import { useLanguage } from '../i18n/context'
 
@@ -12,7 +12,7 @@ const GEM_SCENE_URL = 'https://gemini.google.com/gem/1a83JP082OIliUQZN5SsBguMOrY
 const GEM_ILLUST_URL = 'https://gemini.google.com/gem/1IUuJXgHTTbMEgv5D_G0HXSHXxYdcfTZg?usp=sharing'
 const GEM_RPGMAKER_URL = 'https://gemini.google.com/gem/1zkDfsN972fczP66xwCiQ6H0jP7HLtGz5?usp=sharing'
 
-export type AppMode = 'video' | 'image' | 'gif' | 'spritesheet' | 'spriteadjust' | 'pixelate' | 'expandshrink' | 'matte' | 'geminiwatermark' | 'nanobananaFullChar' | 'seedanceWatermark' | null
+export type AppMode = 'video' | 'image' | 'gif' | 'spritesheet' | 'spriteadjust' | 'pixelate' | 'expandshrink' | 'matte' | 'geminiwatermark' | 'nanobananaFullChar' | 'seedanceWatermark' | 'assetsAndSource' | null
 
 interface Props {
   onSelect: (mode: AppMode) => void
@@ -413,7 +413,7 @@ export default function ModeSelector({ onSelect }: Props) {
       </Col>
     </Row>
       <Row gutter={24} style={{ marginTop: 8, marginBottom: 24 }}>
-        <Col xs={24}>
+        <Col xs={24} md={12}>
           <Card
             hoverable
             onClick={() => onSelect('seedanceWatermark')}
@@ -424,6 +424,7 @@ export default function ModeSelector({ onSelect }: Props) {
               borderColor: '#9a8b78',
               background: 'linear-gradient(135deg, #ede6dc 0%, #e8dfd4 100%)',
               borderWidth: 2,
+              height: '100%',
             }}
           >
             <VideoCameraOutlined style={{ fontSize: 36, color: '#b55233', marginBottom: 12 }} />
@@ -432,6 +433,29 @@ export default function ModeSelector({ onSelect }: Props) {
             </div>
             <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12, lineHeight: 1.4 }}>
               {t('moduleSeedanceWatermarkRemoverDesc')}
+            </Text>
+          </Card>
+        </Col>
+        <Col xs={24} md={12}>
+          <Card
+            hoverable
+            onClick={() => onSelect('assetsAndSource')}
+            styles={{ body: { padding: '16px 24px' } }}
+            style={{
+              textAlign: 'center',
+              cursor: 'pointer',
+              borderColor: '#9a8b78',
+              background: 'linear-gradient(135deg, #ede6dc 0%, #e8dfd4 100%)',
+              borderWidth: 2,
+              height: '100%',
+            }}
+          >
+            <ShareAltOutlined style={{ fontSize: 36, color: '#b55233', marginBottom: 12 }} />
+            <div style={{ lineHeight: 1.4 }}>
+              <Text strong style={{ fontSize: 15 }}>{t('moduleAssetsAndSource')}</Text>
+            </div>
+            <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12, lineHeight: 1.4 }}>
+              {t('moduleAssetsAndSourceDesc')}
             </Text>
           </Card>
         </Col>
