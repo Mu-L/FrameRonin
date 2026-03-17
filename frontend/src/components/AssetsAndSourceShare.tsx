@@ -6,7 +6,6 @@ const { Text } = Typography
 
 const GITHUB_REPO_URL = 'https://github.com/systemchester/FrameRonin'
 const ASSETS_URL = 'https://github.com/systemchester/Spritesheetweapon/tree/master/01-%E7%BE%8E%E6%9C%AF'
-const GITHUB_RELEASES_URL = 'https://github.com/systemchester/FrameRonin/releases'
 const GODOT_CODE_URL = 'https://github.com/systemchester/Spritesheetweapon/tree/master/02-%E7%A8%8B%E5%BA%8F/godot%E8%84%9A%E6%9C%AC'
 // TODO: 替换为成品项目链接
 const FINISHED_PROJECT_URL = 'https://github.com/systemchester/Spritesheetweapon'
