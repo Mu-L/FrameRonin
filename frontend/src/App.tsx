@@ -23,6 +23,7 @@ import ImageGeminiWatermark from './components/ImageGeminiWatermark'
 import NanobananaFullChar from './components/NanobananaFullChar'
 import SeedanceWatermarkRemover from './components/SeedanceWatermarkRemover'
 import AssetsAndSourceShare from './components/AssetsAndSourceShare'
+import ControlTest from './components/ControlTest'
 
 const ImageMatte = lazy(() => import('./components/ImageMatte'))
 import ParamsStep from './components/ParamsStep'
@@ -304,6 +305,8 @@ function App() {
               </div>
               <AssetsAndSourceShare />
             </Card>
+          ) : mode === 'controlTest' ? (
+            <ControlTest onBack={() => setMode(null)} />
           ) : (
             <>
               <Steps
