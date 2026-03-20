@@ -1,4 +1,4 @@
-# FrameRonin - Video to Frames · Matte · Sprite Sheet v2.5
+# FrameRonin - Video to Frames · Matte · Sprite Sheet **V3**
 
 [中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
 
@@ -6,18 +6,29 @@ Pixel image and frame sequence toolset: video frame extraction, GIF processing, 
 
 ![AI Pixel Shop K Preview](frontend/public/K.png)
 
+## What's New in V3
+
+- **Global shortcuts (home / in-feature)**: On home, **C** opens GIF↔Frames, **V** Pixel Image Processing, **G** Gemini watermark removal, **R** RoninPro → **Custom Scale**; from any main feature, **B** returns home (ignored when an input/textarea/contenteditable is focused or with Ctrl/Cmd/Alt). See **Web Shortcuts** below.
+- **RoninPro**: Custom scale, custom slice, unify size, and more; NFT gate is controlled by `RONIN_PRO_REQUIRE_NFT` in `frontend/src/config/features.ts` (default: no NFT required); **R** deep-links to Custom Scale.
+- **Home layout**: RoninPro row is placed **above** Seedance watermark removal and asset/source sharing.
+- **GIF ↔ Frames**: Default tab is **multi-image merge to single**; default input mode is **split single image** (grid split then merge).
+- **Sprite Sheet Adjust**: Animation preview uses arrow buttons; **A / D** step through selected frames (when not typing); **recombine** exports sheet after per-frame offsets.
+- **Control test scenes**: **Top-down** and **Arcade** demo scenes on the first home row.
+
 ## Features
 
 ### Video & Frames
 - **Video to Frames**: Upload video, extract frames, rembg matte, generate Sprite Sheet
-- **GIF ↔ Frames**: GIF extraction, frames to GIF, multi-image merge, single image split, simple stitch (vertical/horizontal)
+- **GIF ↔ Frames**: GIF extraction, frames to GIF, multi-image merge (default tab), split one image by grid then merge, single image split, simple stitch (vertical/horizontal)
 - **Sprite Sheet**: Split frame images / Combine to GIF
-- **Sprite Sheet Adjust**: Split preview, frame selection, animation preview (Ronin login required)
+- **Sprite Sheet Adjust**: Split preview, frame selection, animation preview (Ronin login required), frame navigation (buttons + **A/D**), recombine export after offsets
 
 ### Image Processing
 - **Pixel Image Processing**: Dual entry
   - **Standard**: Scale, inner stroke, crop, matte (green/blue screen)
-    - **RPGMAKER One-Click**: Remove Gemini watermark → top-left matte (tolerance 80/feather 5) → 144×144 hard scale → RPGMAKER output
+    - **RPGMAKER One-Click**: Remove Gemini watermark → contiguous matte from top-left (tolerance 80/feather 5) → 144×144 hard scale → RPGMAKER output
+    - **RPGMAKER V2 One-Click (5 rows)**: Watermark → 256×256 hard scale → contiguous matte from first pixel → crop 64px right + 64px transparent bottom → rows 3–4 shifted down 64px, row 3 mirrored from row 2 → 5×3 grid, trim 8px per side per cell, merge → 144×240
+    - **RPGMAKER V2 One-Click (4 rows)**: Same pipeline, then crop 48px from bottom → 144×192
     - **One-Image-All-Actions**: Remove Gemini watermark → 256×256 hard scale → top-left matte (tolerance 80) → crop 4px right/bottom → 252×252
     - **RPGMAKER Generate**: 3-row split, row 2 flip copy, row 3 shift 48px
   - **Fine Edit**: Brush, eraser, super eraser (connected region + tolerance), toggle bg color, undo (Ctrl+Z), zoom, pan
@@ -31,9 +42,23 @@ Pixel image and frame sequence toolset: video frame extraction, GIF processing, 
 - **nanobanana Pixel Scene** & **Standing Illustration**: Link to Gemini
 - **nanob Full Character Action Test**: V4Tx3 continuous actions, etc.
 
+### RoninPro (efficiency)
+- **RoninPro** (Ronin login): **Custom Scale**, **Custom Slice**, **Unify Size**, etc. NFT requirement: see `frontend/src/config/features.ts`.
+
+### Demo / experimental
+- **Top-down Test Scene**, **Arcade Test Scene**: Control and layering experiments (not the main production pipeline).
+
 ### Other
 - **Seedance 2.0 Video Watermark Removal**: Requires local backend. Remove "AI生成" from Seedance/Jiemeng videos
 - **Assets & Game Source Share**: 01-Art assets, Godot scripts, finished projects (incl. AI Pixel Shop K)
+
+### Web Shortcuts
+
+- **V**: On the **home** screen, open **Pixel Image Processing** (entry picker; same focus/modifier rules as below).
+- **R**: On the **home** screen, open **RoninPro → Custom Scale** (Ronin login required; NFT gate applies if enabled; same focus/modifier rules as below).
+- **G**: On the **home** screen, open **Gemini Watermark Removal** (same focus/modifier rules as below).
+- **C**: On the **home** screen, open **GIF ↔ Frames** (same as the card; same focus/modifier rules as below).
+- **B**: Return to home from any main feature. Ignored while focus is in an input, textarea, or contenteditable; also ignored with Ctrl / Cmd / Alt (avoids browser shortcuts). The video workflow resets the upload step; the image module returns to its entry selection screen.
 
 ## Requirements
 
@@ -140,4 +165,9 @@ docker-compose up -d
 
 ## Docs
 
-See [DEV_DOC_video2timesheet.md](./DEV_DOC_video2timesheet.md)
+| Doc | Description |
+|-----|-------------|
+| [DEV_DOC_video2timesheet.md](./DEV_DOC_video2timesheet.md) | Video→frames / Sprite Sheet product & API design |
+| [DEV_PLAN_extensions.md](./DEV_PLAN_extensions.md) | Extension plan & V3 shipped checklist |
+| [DEPLOY.md](./DEPLOY.md) | Push, CNB/EdgeOne, deploy notes |
+| [frontend/README.md](./frontend/README.md) | Frontend project notes |

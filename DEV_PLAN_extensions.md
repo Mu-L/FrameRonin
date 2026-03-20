@@ -1,19 +1,36 @@
 # FrameRonin / PixelWork 功能扩展开发计划
 
-> 本文档为规划文档，不涉及代码修改。基于当前 v1.6 功能与架构，梳理可扩展方向并制定开发计划。
+> 本文档为规划文档，以「还能做什么」为主；**V3** 已落地能力见下方 **「零、V3 已交付」**，避免与代码脱节。
 
 ---
 
-## 一、当前功能概览
+## 零、V3 已交付（与规划项的对应）
+
+| 类别 | 已实现 | 备注 |
+|------|--------|------|
+| F1 / F7 | Sprite Sheet 拆分、Sheet→GIF | `SpriteSheetTool`、`GifFrameConverter` |
+| 纯前端 GIF | GIF 拆帧/合成、多图合一、单图拆分网格、简易拼接 | 默认 Tab「多图合成单图」、默认输入「拆分单图」 |
+| E5（部分） | 首页与应用级快捷键 **B/C/V/G/R**；Sprite Sheet 调整预览 **A/D** 切帧 | `App.tsx`、`SpriteSheetAdjust.tsx` |
+| 产品线 | **RoninPro**：自定义缩放、切片、统一尺寸；NFT 开关 `frontend/src/config/features.ts` | 深链 **R** → 自定义缩放 |
+| 首页结构 | RoninPro 置于 Seedance + 素材分享之前 | `ModeSelector.tsx` |
+| Sprite Sheet 调整 | 分割预览、勾选、播放预览、方向按钮、偏移后 **重组合** 导出 | `SpriteSheetAdjust.tsx` |
+| 实验场景 | **Top-down** / **街机** 控制测试 | `ControlTest.tsx`（variant） |
+| 像素与抠图链 | 像素处理双入口、色度键、扩缩图、Gemini 去水印等 | 见根目录 README |
+
+**部署现状**：GitHub Pages 仅部署前端；带 rembg 的「视频转序列帧」服务端管线仍需自建后端（见 `DEV_DOC_video2timesheet.md`）。
+
+---
+
+## 一、当前功能概览（基线 + V3）
 
 | 模块 | 功能 | 前端/后端 | 备注 |
 |------|------|-----------|------|
-| 视频转序列帧 | 视频→帧→抠图→Sprite Sheet | 需后端 API | rembg、FFmpeg、Redis Worker |
-| 像素图片处理 | 裁切、抠图、缩放、内描边 | 纯前端 | ImageCropEditor、applyChromaKey |
-| GIF↔序列帧 | GIF拆帧、多图合成GIF | 纯前端 | gifuct-js、gifenc |
-| nanobanana 生成器 | 外链 Gemini Gem | 外链 | 不占开发资源 |
-
-**部署现状**：GitHub Pages 仅部署前端；视频模块需自建后端。
+| 视频转序列帧 | 视频→帧→抠图→Sprite Sheet | 浏览器色度键 **或** 后端 API | 后端路径：rembg、FFmpeg、Redis Worker |
+| 像素图片处理 | 裁切、抠图、缩放、内描边、精细编辑等 | 纯前端 | `ImageResizeStroke` 等 |
+| GIF↔序列帧 | GIF拆帧、多图合成、单图网格拆分等 | 纯前端 | gifuct-js、gifenc |
+| Sprite Sheet / 调整 | 拆分、合成 GIF、勾选与预览、重组合 | 纯前端（调整需 Ronin） | `SpriteSheetTool`、`SpriteSheetAdjust` |
+| RoninPro | 缩放/切片/统一尺寸 | 纯前端 | `RoninPro*.tsx` |
+| nanobanana 生成器 | 外链 Gemini Gem | 外链 | 不占核心开发资源 |
 
 ---
 
@@ -170,5 +187,5 @@
 
 ---
 
-*文档版本：v1.0*  
-*更新日期：根据实际开发进度维护*
+*文档版本：v3.0（与产品 **V3** 对齐）*  
+*更新说明：已增加「V3 已交付」对照；规划表仍保留待办项。*

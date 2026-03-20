@@ -201,7 +201,7 @@ function compositeFrame(
 
 export default function GifFrameConverter() {
   const { t } = useLanguage()
-  const [activeTab, setActiveTab] = useState<'gif2frames' | 'frames2gif' | 'images2single' | 'simpleStitch'>('gif2frames')
+  const [activeTab, setActiveTab] = useState<'gif2frames' | 'frames2gif' | 'images2single' | 'simpleStitch'>('images2single')
   const [gifFile, setGifFile] = useState<File | null>(null)
   const [gifPreviewUrl, setGifPreviewUrl] = useState<string | null>(null)
   const [frameFiles, setFrameFiles] = useState<File[]>([])
@@ -219,7 +219,7 @@ export default function GifFrameConverter() {
   const [combineInputUrls, setCombineInputUrls] = useState<string[]>([])
   const [dragReorderIdx, setDragReorderIdx] = useState<number | null>(null)
   const [combineCols, setCombineCols] = useState(4)
-  const [imagesToSingleInputMode, setImagesToSingleInputMode] = useState<'multi' | 'split'>('multi')
+  const [imagesToSingleInputMode, setImagesToSingleInputMode] = useState<'multi' | 'split'>('split')
   const [splitFile, setSplitFile] = useState<File | null>(null)
   const [splitFileUrl, setSplitFileUrl] = useState<string | null>(null)
   const [splitRows, setSplitRows] = useState(2)

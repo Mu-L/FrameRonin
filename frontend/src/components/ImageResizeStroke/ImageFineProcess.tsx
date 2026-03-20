@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Upload, message } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd'
@@ -11,12 +11,18 @@ const { Dragger } = Upload
 const IMAGE_ALLOWED = ['.png', '.jpg', '.jpeg', '.webp']
 const IMAGE_MAX_MB = 20
 
-export default function ImageFineProcess() {
+export interface ImageFineProcessProps {
+  /** 从常规处理等板块传入时自动载入（载入后应通过 onHandoffConsumed 清除，避免重复） */
+  handoffFile?: File | null
+  onHandoffConsumed?: () => void
+}
+
+export default function ImageFineProcess({ handoffFile = null, onHandoffConsumed }: ImageFineProcessProps = {}) {
   const { t } = useLanguage()
   const [file, setFile] = useState<File | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
 
-  const handleFile = async (f: File | null) => {
+  const handleFile = async (f: File | null): Promise<void> => {
     setFile(f)
     setImageUrl(null)
     if (f) {
@@ -42,6 +48,12 @@ export default function ImageFineProcess() {
       }
     }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅响应外部 handoff
+  useEffect(() => {
+    if (!handoffFile) return
+    void handleFile(handoffFile).finally(() => onHandoffConsumed?.())
+  }, [handoffFile])
 
   return (
     <div style={{ width: '100%' }}>

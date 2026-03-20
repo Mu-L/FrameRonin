@@ -1,73 +1,31 @@
-# React + TypeScript + Vite
+# FrameRonin 前端（V3）
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite + TypeScript + Ant Design。业务入口与模块说明以仓库根目录 **[README.md](../README.md)** 为准（中 / en / ja）。
 
-Currently, two official plugins are available:
+## 本地运行
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+默认开发服务器：<http://localhost:5173>（与根目录文档中的后端端口 8000 配合使用）。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 工程结构（提要）
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| 路径 | 说明 |
+|------|------|
+| `src/App.tsx` | 路由式模块切换、**全局快捷键**（B/C/V/G/R）、RoninPro 深链 |
+| `src/components/ModeSelector.tsx` | 首页模块卡片与顺序 |
+| `src/config/features.ts` | **功能开关**（如 `RONIN_PRO_REQUIRE_NFT`） |
+| `src/i18n/` | 文案与语言上下文 |
+| `src/components/*.tsx` | 各功能模块（GIF、Sprite Sheet、RoninPro 等） |
+
+## 开发与发布注意
+
+- 新增面向用户的文案时，请同步 **zh / en / ja**（`src/i18n/locales.ts`）。
+- GitHub Pages 多为**纯静态**部署：依赖浏览器与纯前端的模块可直接使用；需 Python Worker + Redis 的能力须在自有环境部署（见根目录 README）。
+
+## 上游模板说明
+
+本目录最初基于 Vite 官方 React-TS 模板生成；当前文档以 FrameRonin 业务为准，ESLint 进阶配置可参考 [Vite 文档](https://vite.dev/) 与 [typescript-eslint](https://typescript-eslint.io/)。

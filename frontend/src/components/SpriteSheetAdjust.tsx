@@ -1,6 +1,6 @@
-import React, { forwardRef, useEffect, useRef, useState } from 'react'
+import React, { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import { Checkbox, ColorPicker, InputNumber, Progress, Segmented, Slider, Space, Typography, Upload } from 'antd'
-import { ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons'
+import { ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined, MinusOutlined, PlusOutlined, StepBackwardOutlined, StepForwardOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd'
 import { useLanguage } from '../i18n/context'
 import StashDropZone from './StashDropZone'
@@ -182,7 +182,7 @@ export default function SpriteSheetAdjust() {
   type PressCountKey = 'up' | 'down' | 'left' | 'right'
   const [framePressCounts, setFramePressCounts] = useState<Record<PressCountKey, number>[]>([])
 
-  const setFrameOffsetAndCount = (idx: number, delta: Partial<FrameOffset>, countKey: PressCountKey) => {
+  const setFrameOffsetAndCount = useCallback((idx: number, delta: Partial<FrameOffset>, countKey: PressCountKey) => {
     setFrameOffsets((prev) => {
       const next = [...prev]
       if (!next[idx]) next[idx] = { dx: 0, dy: 0 }
@@ -198,7 +198,7 @@ export default function SpriteSheetAdjust() {
       next[idx] = { ...next[idx]!, [countKey]: (next[idx]![countKey] ?? 0) + 1 }
       return next
     })
-  }
+  }, [])
 
   useEffect(() => {
     if (file) {
@@ -368,6 +368,12 @@ export default function SpriteSheetAdjust() {
   const displayUrl = frameUrls[displayIdx]
   const speed = Math.max(50, frameDelay / speedScale)
 
+  /** 避免勾选变化后 displayIdx 未变导致键盘回调闭包过期 */
+  const selMin = selectedIndices.length > 0 ? Math.min(...selectedIndices) : 0
+  const selMax = selectedIndices.length > 0 ? Math.max(...selectedIndices) : 0
+  const animKbdRef = useRef({ displayIdx: 0, selectedLen: 0, selMin: 0, selMax: 0 })
+  animKbdRef.current = { displayIdx, selectedLen: selectedIndices.length, selMin, selMax }
+
   useEffect(() => {
     if (!playing || selectedIndices.length === 0) return
     const id = setInterval(() => {
@@ -375,6 +381,108 @@ export default function SpriteSheetAdjust() {
     }, speed)
     return () => clearInterval(id)
   }, [playing, selectedIndices.length, speed])
+
+  useEffect(() => {
+    /** Q/E 扩选：按行优先（左→右、上→下）连续编号，行尾下一格为下一行第一格 */
+    const totalCells = frameUrls.length
+    const neighborLeftRowMajor = (idx: number): number | null => {
+      if (idx <= 0) return null
+      return idx - 1
+    }
+    const neighborRightRowMajor = (idx: number): number | null => {
+      if (idx >= totalCells - 1) return null
+      return idx + 1
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = document.activeElement?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if ((document.activeElement as HTMLElement | null)?.isContentEditable) return
+      if (frameUrls.length === 0) return
+
+      const { displayIdx: dIdx, selectedLen, selMin: rangeMin, selMax: rangeMax } = animKbdRef.current
+
+      // Q/E：按「已激活范围」扩张到行优先顺序上的外侧一格（含跨行：行末 → 下一行首）
+      if (e.code === 'KeyQ') {
+        if (selectedLen === 0) return
+        if (e.shiftKey) {
+          e.preventDefault()
+          setSelected((prev) => {
+            const next = [...prev]
+            next[rangeMin] = false
+            return next
+          })
+          return
+        }
+        const n = neighborLeftRowMajor(rangeMin)
+        if (n == null) return
+        e.preventDefault()
+        setSelected((prev) => {
+          const next = [...prev]
+          next[n] = true
+          return next
+        })
+        return
+      }
+      if (e.code === 'KeyE') {
+        if (selectedLen === 0) return
+        if (e.shiftKey) {
+          e.preventDefault()
+          setSelected((prev) => {
+            const next = [...prev]
+            next[rangeMax] = false
+            return next
+          })
+          return
+        }
+        const n = neighborRightRowMajor(rangeMax)
+        if (n == null) return
+        e.preventDefault()
+        setSelected((prev) => {
+          const next = [...prev]
+          next[n] = true
+          return next
+        })
+        return
+      }
+
+      if (selectedLen === 0) return
+
+      if (e.code === 'KeyA') {
+        e.preventDefault()
+        setCurrentIdx((i) => (i - 1 + selectedLen) % selectedLen)
+        return
+      }
+      if (e.code === 'KeyD') {
+        e.preventDefault()
+        setCurrentIdx((i) => (i + 1) % selectedLen)
+        return
+      }
+      // 与动态帧预览旁的上下左右位移按钮一致（微调当前预览帧在格内偏移）
+      if (e.code === 'ArrowUp') {
+        e.preventDefault()
+        setFrameOffsetAndCount(dIdx, { dy: -1 }, 'up')
+        return
+      }
+      if (e.code === 'ArrowDown') {
+        e.preventDefault()
+        setFrameOffsetAndCount(dIdx, { dy: 1 }, 'down')
+        return
+      }
+      if (e.code === 'ArrowLeft') {
+        e.preventDefault()
+        setFrameOffsetAndCount(dIdx, { dx: -1 }, 'left')
+        return
+      }
+      if (e.code === 'ArrowRight') {
+        e.preventDefault()
+        setFrameOffsetAndCount(dIdx, { dx: 1 }, 'right')
+        return
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [setFrameOffsetAndCount, frameUrls.length])
 
   const toggleSelect = (idx: number) => {
     setSelected((prev) => {
@@ -461,65 +569,6 @@ export default function SpriteSheetAdjust() {
             <Text type="secondary">{t('spriteRows')} M:</Text>
             <InputNumber min={1} max={64} value={rows} onChange={(v) => setRows(v ?? 4)} style={{ width: 72 }} />
           </Space>
-          {frameUrls.length > 0 && (
-            <div className="sprite-adjust-recombine" style={{ marginBottom: 20, padding: '16px 20px', background: 'rgba(181,82,51,0.12)', borderRadius: 8, border: '2px solid rgba(181,82,51,0.4)' }}>
-              <Text strong style={{ display: 'block', marginBottom: 4, fontSize: 15 }}>{t('spriteAdjustRecombine')}</Text>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
-                {t('spriteAdjustRecombineHint')}
-              </Text>
-              <Space wrap>
-                <button
-                  type="button"
-                  onClick={handleRecombine}
-                  disabled={recombining}
-                  style={{
-                    padding: '10px 24px',
-                    border: '1px solid #9a8b78',
-                    borderRadius: 4,
-                    background: '#b55233',
-                    color: '#fff',
-                    cursor: recombining ? 'not-allowed' : 'pointer',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    opacity: recombining ? 0.7 : 1,
-                  }}
-                >
-                  {recombining ? t('spriteAdjustRecombining') : t('spriteAdjustRecombineBtn')}
-                </button>
-                {recombinedUrl && (
-                  <a
-                    href={recombinedUrl}
-                    download={
-                      recombinedParams
-                        ? `recombined_${cols}x${rows}_${recombinedParams.cellW}x${recombinedParams.cellH}_${cols * recombinedParams.cellW}x${rows * recombinedParams.cellH}.png`
-                        : 'recombined-sprite.png'
-                    }
-                    style={{
-                      padding: '10px 24px',
-                      border: '1px solid #9a8b78',
-                      borderRadius: 4,
-                      background: '#e4dbcf',
-                      color: '#3d3428',
-                      textDecoration: 'none',
-                      fontSize: 14,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {t('spriteAdjustDownloadRecombined')}
-                  </a>
-                )}
-              </Space>
-              {recombinedUrl && (
-                <div style={{ marginTop: 12, maxWidth: 480 }}>
-                  <img
-                    src={recombinedUrl}
-                    alt=""
-                    style={{ maxWidth: '100%', display: 'block', borderRadius: 6, border: '1px solid #9a8b78', imageRendering: 'pixelated' }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
           {frameUrls.length > 0 && (
             <>
               <Text strong style={{ display: 'block' }}>{t('spriteAdjustPreview')}</Text>
@@ -632,63 +681,6 @@ export default function SpriteSheetAdjust() {
                   }),
                 ])}
               </div>
-              <div className="sprite-adjust-recombine" style={{ marginTop: 24 }}>
-                <Text strong style={{ display: 'block' }}>{t('spriteAdjustRecombine')}</Text>
-                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
-                  {t('spriteAdjustRecombineHint')}
-                </Text>
-                <Space wrap>
-                  <button
-                    type="button"
-                    onClick={handleRecombine}
-                    disabled={recombining}
-                    style={{
-                      padding: '8px 20px',
-                      border: '1px solid #9a8b78',
-                      borderRadius: 4,
-                      background: '#b55233',
-                      color: '#fff',
-                      cursor: recombining ? 'not-allowed' : 'pointer',
-                      fontSize: 14,
-                      fontWeight: 500,
-                      opacity: recombining ? 0.7 : 1,
-                    }}
-                  >
-                    {recombining ? t('spriteAdjustRecombining') : t('spriteAdjustRecombineBtn')}
-                  </button>
-                  {recombinedUrl && (
-                    <a
-                      href={recombinedUrl}
-                      download={
-                        recombinedParams
-                          ? `recombined_${cols}x${rows}_${recombinedParams.cellW}x${recombinedParams.cellH}_${cols * recombinedParams.cellW}x${rows * recombinedParams.cellH}.png`
-                          : 'recombined-sprite.png'
-                      }
-                      style={{
-                        padding: '8px 20px',
-                        border: '1px solid #9a8b78',
-                        borderRadius: 4,
-                        background: '#e4dbcf',
-                        color: '#3d3428',
-                        textDecoration: 'none',
-                        fontSize: 14,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {t('spriteAdjustDownloadRecombined')}
-                    </a>
-                  )}
-                </Space>
-                {recombinedUrl && (
-                  <div style={{ marginTop: 12, maxWidth: 480 }}>
-                    <img
-                      src={recombinedUrl}
-                      alt=""
-                      style={{ maxWidth: '100%', display: 'block', borderRadius: 6, border: '1px solid #9a8b78', imageRendering: 'pixelated' }}
-                    />
-                  </div>
-                )}
-              </div>
               {selectedIndices.length > 0 && (
                 <div className="sprite-adjust-anim" style={{ marginTop: 24 }}>
                   <Text strong style={{ display: 'block' }}>{t('spriteAdjustAnimPreview')}</Text>
@@ -721,6 +713,38 @@ export default function SpriteSheetAdjust() {
                       }}
                     >
                       {playing ? t('pause') : t('play')}
+                    </button>
+                    <button
+                      type="button"
+                      title={t('prevFrame')}
+                      onClick={() => setCurrentIdx((i) => (selectedIndices.length > 0 ? (i - 1 + selectedIndices.length) % selectedIndices.length : 0))}
+                      style={{
+                        padding: '6px 10px',
+                        border: '1px solid #9a8b78',
+                        borderRadius: 4,
+                        background: '#e4dbcf',
+                        color: '#3d3428',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                    >
+                      <StepBackwardOutlined />
+                    </button>
+                    <button
+                      type="button"
+                      title={t('nextFrame')}
+                      onClick={() => setCurrentIdx((i) => (i + 1) % selectedIndices.length)}
+                      style={{
+                        padding: '6px 10px',
+                        border: '1px solid #9a8b78',
+                        borderRadius: 4,
+                        background: '#e4dbcf',
+                        color: '#3d3428',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                    >
+                      <StepForwardOutlined />
                     </button>
                     <span style={{ marginLeft: 16, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <button
@@ -782,6 +806,7 @@ export default function SpriteSheetAdjust() {
                     </span>
                   </Space>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 8 }}>
                     <div
                       ref={previewContainerRef}
                       className="sprite-adjust-anim-display"
@@ -934,6 +959,41 @@ export default function SpriteSheetAdjust() {
                           }}
                         />
                       )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, padding: 2, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setFrameOffsetAndCount(displayIdx, { dy: -1 }, 'up') }}
+                        title={t('spriteAdjustShiftUp')}
+                        style={shiftBtnStyle}
+                      >
+                        {(framePressCounts[displayIdx]?.up ?? 0) === 0 ? <ArrowUpOutlined style={{ fontSize: 10 }} /> : (framePressCounts[displayIdx]?.up ?? 0)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setFrameOffsetAndCount(displayIdx, { dy: 1 }, 'down') }}
+                        title={t('spriteAdjustShiftDown')}
+                        style={shiftBtnStyle}
+                      >
+                        {(framePressCounts[displayIdx]?.down ?? 0) === 0 ? <ArrowDownOutlined style={{ fontSize: 10 }} /> : (framePressCounts[displayIdx]?.down ?? 0)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setFrameOffsetAndCount(displayIdx, { dx: -1 }, 'left') }}
+                        title={t('spriteAdjustShiftLeft')}
+                        style={shiftBtnStyle}
+                      >
+                        {(framePressCounts[displayIdx]?.left ?? 0) === 0 ? <ArrowLeftOutlined style={{ fontSize: 10 }} /> : (framePressCounts[displayIdx]?.left ?? 0)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setFrameOffsetAndCount(displayIdx, { dx: 1 }, 'right') }}
+                        title={t('spriteAdjustShiftRight')}
+                        style={shiftBtnStyle}
+                      >
+                        {(framePressCounts[displayIdx]?.right ?? 0) === 0 ? <ArrowRightOutlined style={{ fontSize: 10 }} /> : (framePressCounts[displayIdx]?.right ?? 0)}
+                      </button>
+                    </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 140 }}>
                       {!fixedPixelMode ? (

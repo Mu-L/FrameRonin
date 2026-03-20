@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Col, ColorPicker, Divider, InputNumber, message, Row, Slider, Space, Typography } from 'antd'
-import { DownloadOutlined, InboxOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EditOutlined, InboxOutlined } from '@ant-design/icons'
 import { Checkbox } from 'antd'
 import { Upload } from 'antd'
 import type { UploadFile } from 'antd'
@@ -9,9 +9,12 @@ import { formatError } from '../i18n/locales'
 import StashableImage from './StashableImage'
 import StashDropZone from './StashDropZone'
 import {
+  appendTransparentBottom,
   applyChromaKey,
   applyChromaKeyContiguousFromTopLeft,
   applyInnerStroke,
+  applyRpgMakerV2FourRowLayout,
+  trimGridCellsEdgeAndMerge,
   cropImageBlob,
   extendImageBottom,
   getTopLeftPixelColor,
@@ -27,7 +30,12 @@ const { Text } = Typography
 const IMAGE_ALLOWED = ['.png', '.jpg', '.jpeg', '.webp']
 const IMAGE_MAX_MB = 20
 
-export default function ImageResizeStroke() {
+export interface ImageResizeStrokeProps {
+  /** 将当前生成预览（Blob）转入精细处理子模块 */
+  onSendToFineProcess?: (blob: Blob, suggestedFilename: string) => void
+}
+
+export default function ImageResizeStroke({ onSendToFineProcess }: ImageResizeStrokeProps = {}) {
   const { t } = useLanguage()
   const [file, setFile] = useState<File | null>(null)
   const [originalUrl, setOriginalUrl] = useState<string | null>(null)
@@ -52,7 +60,16 @@ export default function ImageResizeStroke() {
   const [extendLoading, setExtendLoading] = useState(false)
   const [oneClickLoading, setOneClickLoading] = useState(false)
   const [oneClickAllActionsLoading, setOneClickAllActionsLoading] = useState(false)
+  const [oneClickRpgMakerV2Loading, setOneClickRpgMakerV2Loading] = useState(false)
+  const [oneClickRpgMakerV2FourRowsLoading, setOneClickRpgMakerV2FourRowsLoading] = useState(false)
   const [ancientCostumeLoading, setAncientCostumeLoading] = useState(false)
+
+  const oneClickBusy =
+    oneClickLoading ||
+    oneClickAllActionsLoading ||
+    oneClickRpgMakerV2Loading ||
+    oneClickRpgMakerV2FourRowsLoading ||
+    ancientCostumeLoading
 
   const croppedW = originalSize ? Math.max(1, originalSize.w - cropRegion.left - cropRegion.right) : 0
   const croppedH = originalSize ? Math.max(1, originalSize.h - cropRegion.top - cropRegion.bottom) : 0
@@ -244,7 +261,7 @@ export default function ImageResizeStroke() {
         r2.onerror = () => reject(new Error('ERR_READ'))
         r2.readAsDataURL(blob)
       })
-      const { dataUrl: matteDataUrl } = await applyChromaKey(dataUrl, r, g, b, 80, 5)
+      const { dataUrl: matteDataUrl } = await applyChromaKeyContiguousFromTopLeft(dataUrl, r, g, b, 80, 5)
       blob = await fetch(matteDataUrl).then((res) => res.blob())
       blob = await resizeImageToBlob(blob, 144, 144, false, true)
       blob = await extendImageBottom(blob, 48)
@@ -284,6 +301,61 @@ export default function ImageResizeStroke() {
       message.error(t('exportFailed') + ': ' + formatError(e, t))
     } finally {
       setOneClickAllActionsLoading(false)
+    }
+  }
+
+  const runRpgMakerV2PipelineToTrimmedGrid = async (): Promise<Blob> => {
+    let blob = await file!.arrayBuffer().then((b) => new Blob([b]))
+    blob = await removeGeminiWatermarkFromBlob(blob)
+    blob = await resizeImageToBlob(blob, 256, 256, false, true)
+    const { r, g, b } = await getTopLeftPixelColor(blob)
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r2 = new FileReader()
+      r2.onload = () => resolve(r2.result as string)
+      r2.onerror = () => reject(new Error('ERR_READ'))
+      r2.readAsDataURL(blob)
+    })
+    const { dataUrl: matteDataUrl } = await applyChromaKeyContiguousFromTopLeft(dataUrl, r, g, b, 80, 5)
+    blob = await fetch(matteDataUrl).then((res) => res.blob())
+    blob = await cropImageBlob(blob, { left: 0, top: 0, right: 64, bottom: 0 })
+    blob = await appendTransparentBottom(blob, 64)
+    blob = await applyRpgMakerV2FourRowLayout(blob)
+    blob = await trimGridCellsEdgeAndMerge(blob, { rows: 5, cols: 3, trimPx: 8 })
+    return blob
+  }
+
+  const handleOneClickRpgMakerV2Process = async () => {
+    if (!file) return
+    setOneClickRpgMakerV2Loading(true)
+    setPreviewUrl((old) => { if (old) URL.revokeObjectURL(old); return null })
+    setPreviewBlob(null)
+    try {
+      const blob = await runRpgMakerV2PipelineToTrimmedGrid()
+      setPreviewBlob(blob)
+      setPreviewUrl(URL.createObjectURL(blob))
+      message.success(t('imgOneClickRpgMakerV2Success'))
+    } catch (e) {
+      message.error(t('exportFailed') + ': ' + formatError(e, t))
+    } finally {
+      setOneClickRpgMakerV2Loading(false)
+    }
+  }
+
+  const handleOneClickRpgMakerV2FourRowsProcess = async () => {
+    if (!file) return
+    setOneClickRpgMakerV2FourRowsLoading(true)
+    setPreviewUrl((old) => { if (old) URL.revokeObjectURL(old); return null })
+    setPreviewBlob(null)
+    try {
+      let blob = await runRpgMakerV2PipelineToTrimmedGrid()
+      blob = await cropImageBlob(blob, { left: 0, top: 0, right: 0, bottom: 48 })
+      setPreviewBlob(blob)
+      setPreviewUrl(URL.createObjectURL(blob))
+      message.success(t('imgOneClickRpgMakerV2FourRowsSuccess'))
+    } catch (e) {
+      message.error(t('exportFailed') + ': ' + formatError(e, t))
+    } finally {
+      setOneClickRpgMakerV2FourRowsLoading(false)
     }
   }
 
@@ -364,7 +436,7 @@ export default function ImageResizeStroke() {
                 size="large"
                 loading={oneClickLoading}
                 onClick={handleOneClickProcess}
-                disabled={oneClickAllActionsLoading || ancientCostumeLoading}
+                disabled={oneClickBusy && !oneClickLoading}
                 style={{ minWidth: 140 }}
               >
                 {t('imgOneClickProcess')}
@@ -376,7 +448,7 @@ export default function ImageResizeStroke() {
                 size="large"
                 loading={oneClickAllActionsLoading}
                 onClick={handleOneClickAllActionsProcess}
-                disabled={oneClickLoading || ancientCostumeLoading}
+                disabled={oneClickBusy && !oneClickAllActionsLoading}
                 style={{ minWidth: 140 }}
               >
                 {t('imgOneClickAllActionsProcess')}
@@ -386,9 +458,33 @@ export default function ImageResizeStroke() {
               <Button
                 type="primary"
                 size="large"
+                loading={oneClickRpgMakerV2Loading}
+                onClick={handleOneClickRpgMakerV2Process}
+                disabled={oneClickBusy && !oneClickRpgMakerV2Loading}
+                style={{ minWidth: 160 }}
+              >
+                {t('imgOneClickRpgMakerV2')}
+              </Button>
+            </div>
+            <div>
+              <Button
+                type="primary"
+                size="large"
+                loading={oneClickRpgMakerV2FourRowsLoading}
+                onClick={handleOneClickRpgMakerV2FourRowsProcess}
+                disabled={oneClickBusy && !oneClickRpgMakerV2FourRowsLoading}
+                style={{ minWidth: 180 }}
+              >
+                {t('imgOneClickRpgMakerV2FourRows')}
+              </Button>
+            </div>
+            <div>
+              <Button
+                type="primary"
+                size="large"
                 loading={ancientCostumeLoading}
                 onClick={handleAncientCostumeProcess}
-                disabled={oneClickLoading || oneClickAllActionsLoading}
+                disabled={oneClickBusy && !ancientCostumeLoading}
                 style={{ minWidth: 140 }}
               >
                 {t('imgAncientCostumeProcess')}
@@ -606,6 +702,19 @@ export default function ImageResizeStroke() {
                   <Button type="primary" icon={<DownloadOutlined />} onClick={download}>
                     {t('imgDownload')}
                   </Button>
+                  {onSendToFineProcess && previewBlob && (
+                    <Button
+                      type="default"
+                      icon={<EditOutlined />}
+                      onClick={() => {
+                        const base = (file?.name?.replace(/\.[^.]+$/, '') || 'output') + '_for_fine.png'
+                        onSendToFineProcess(previewBlob, base)
+                        message.success(t('imgSendToFineProcessDone'))
+                      }}
+                    >
+                      {t('imgSendToFineProcess')}
+                    </Button>
+                  )}
                 </Space>
               </div>
             </>

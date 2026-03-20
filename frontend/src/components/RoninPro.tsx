@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Card, Space, Typography } from 'antd'
 import { ArrowLeftOutlined, ExpandOutlined, LockOutlined, MergeCellsOutlined, ScissorOutlined } from '@ant-design/icons'
 import { useAuth } from '../auth/context'
+import { RONIN_PRO_REQUIRE_NFT } from '../config/features'
 import { useNftOwnership } from '../hooks/useNftOwnership'
 import { useLanguage } from '../i18n/context'
 import RoninProCustomScale from './RoninProCustomScale'
@@ -10,13 +11,22 @@ import RoninProUnifySize from './RoninProUnifySize'
 
 interface RoninProProps {
   onBack?: () => void
+  /** 外部一次性格子模块（如首页快捷键），进入后由 onDeepLinkConsumed 清空 */
+  deepLinkFeature?: string | null
+  onDeepLinkConsumed?: () => void
 }
 
-export default function RoninPro({ onBack }: RoninProProps) {
+export default function RoninPro({ onBack, deepLinkFeature = null, onDeepLinkConsumed }: RoninProProps) {
   const { t } = useLanguage()
   const { address, isConnected } = useAuth()
-  const ownsNft = useNftOwnership(address)
+  const ownsNft = useNftOwnership(RONIN_PRO_REQUIRE_NFT ? address : null)
   const [activeFeature, setActiveFeature] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!deepLinkFeature) return
+    setActiveFeature(deepLinkFeature)
+    onDeepLinkConsumed?.()
+  }, [deepLinkFeature, onDeepLinkConsumed])
 
   if (!isConnected) {
     return (
@@ -37,7 +47,7 @@ export default function RoninPro({ onBack }: RoninProProps) {
     )
   }
 
-  if (ownsNft === false) {
+  if (RONIN_PRO_REQUIRE_NFT && ownsNft === false) {
     return (
       <div style={{ padding: 24 }}>
         {onBack && (
@@ -56,7 +66,7 @@ export default function RoninPro({ onBack }: RoninProProps) {
     )
   }
 
-  if (ownsNft === null) {
+  if (RONIN_PRO_REQUIRE_NFT && ownsNft === null) {
     return (
       <div style={{ padding: 24 }}>
         {onBack && (

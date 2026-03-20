@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react'
+import { lazy, Suspense, useCallback, useState, useEffect } from 'react'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { App as AntdApp, Button, Card, ConfigProvider, Layout, message, Spin, Steps } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -75,7 +75,12 @@ function App() {
   const { lang, setLang, t } = useLanguage()
   const [gemToken, setGemToken] = useState(() => getGemToken())
   const [mode, setMode] = useState<AppMode>(null)
+  /** 首页快捷键进入 RoninPro 子模块（如 R → 自定义缩放） */
+  const [roninProDeepLink, setRoninProDeepLink] = useState<string | null>(null)
+  const consumeRoninProDeepLink = useCallback(() => setRoninProDeepLink(null), [])
   const [imageSubMode, setImageSubMode] = useState<ImageSubMode | 'select'>('select')
+  /** 常规处理 → 精细处理 图稿传递 */
+  const [imageHandoffToFine, setImageHandoffToFine] = useState<File | null>(null)
 
   useEffect(() => {
     const id = setInterval(() => setGemToken(getGemToken()), 60_000)
@@ -97,6 +102,101 @@ function App() {
     crop_mode: 'tight_bbox',
   })
   const currentStep = STEP_KEYS.indexOf(step)
+
+  /** 任意大功能内按 B 返回首页（输入框内不触发，避免误触） */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (mode === null) return
+      if (e.code !== 'KeyB') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement
+      const tag = el?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if (el instanceof HTMLElement && el.isContentEditable) return
+      e.preventDefault()
+      if (mode === 'video') {
+        setStep('upload')
+        setFile(null)
+      }
+      if (mode === 'image') {
+        setImageSubMode('select')
+      }
+      setRoninProDeepLink(null)
+      setMode(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode])
+
+  /** 首页按 C 进入 GIF ↔ 序列帧模块 */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (mode !== null) return
+      if (e.code !== 'KeyC') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement
+      const tag = el?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if (el instanceof HTMLElement && el.isContentEditable) return
+      e.preventDefault()
+      setMode('gif')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode])
+
+  /** 首页按 R 进入 RoninPro → 自定义缩放 */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (mode !== null) return
+      if (e.code !== 'KeyR') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement
+      const tag = el?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if (el instanceof HTMLElement && el.isContentEditable) return
+      e.preventDefault()
+      setRoninProDeepLink('customScale')
+      setMode('roninPro')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode])
+
+  /** 首页按 G 进入 Gemini 水印去除 */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (mode !== null) return
+      if (e.code !== 'KeyG') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement
+      const tag = el?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if (el instanceof HTMLElement && el.isContentEditable) return
+      e.preventDefault()
+      setMode('geminiwatermark')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode])
+
+  /** 首页按 V 进入像素图片处理 */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (mode !== null) return
+      if (e.code !== 'KeyV') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement
+      const tag = el?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if (el instanceof HTMLElement && el.isContentEditable) return
+      e.preventDefault()
+      setImageSubMode('select')
+      setMode('image')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode])
 
   const wastelandTheme: ThemeConfig = {
     token: {
@@ -137,7 +237,7 @@ function App() {
               <div className="app-header-text">
                 <div className="app-header-row">
                   <h1 className="app-header-brand">FrameRonin</h1>
-                  <span className="app-header-ver">v2.1</span>
+                  <span className="app-header-ver">V3</span>
                 </div>
                 <p className="app-header-subtitle">{t('subtitle')}</p>
               </div>
@@ -153,7 +253,16 @@ function App() {
         >
           {mode === null ? (
             <Card>
-              <ModeSelector onSelect={(m) => { setMode(m); if (m === 'image') setImageSubMode('select') }} />
+              <ModeSelector
+                onSelect={(m) => {
+                  setMode(m)
+                  if (m === 'image') {
+                    setImageSubMode('select')
+                    setImageHandoffToFine(null)
+                  }
+                  if (m === 'roninPro') setRoninProDeepLink(null)
+                }}
+              />
             </Card>
           ) : mode === 'image' ? (
             <Card>
@@ -169,9 +278,20 @@ function App() {
               {imageSubMode === 'select' ? (
                 <ImageModuleEntry onSelect={setImageSubMode} />
               ) : imageSubMode === 'normal' ? (
-                <ImageResizeStroke />
+                <ImageResizeStroke
+                  onSendToFineProcess={(blob, suggestedFilename) => {
+                    const name = /\.(png|jpe?g|webp)$/i.test(suggestedFilename)
+                      ? suggestedFilename
+                      : `${suggestedFilename}.png`
+                    setImageHandoffToFine(new File([blob], name, { type: 'image/png' }))
+                    setImageSubMode('fine')
+                  }}
+                />
               ) : (
-                <ImageFineProcess />
+                <ImageFineProcess
+                  handoffFile={imageHandoffToFine}
+                  onHandoffConsumed={() => setImageHandoffToFine(null)}
+                />
               )}
             </Card>
           ) : mode === 'gif' ? (
@@ -312,7 +432,11 @@ function App() {
             <ControlTest onBack={() => setMode(null)} variant="arcade" />
           ) : mode === 'roninPro' ? (
             <Card>
-              <RoninPro onBack={() => setMode(null)} />
+              <RoninPro
+                onBack={() => { setRoninProDeepLink(null); setMode(null) }}
+                deepLinkFeature={roninProDeepLink}
+                onDeepLinkConsumed={consumeRoninProDeepLink}
+              />
             </Card>
           ) : (
             <>

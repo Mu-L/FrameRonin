@@ -1,4 +1,8 @@
-# 部署说明
+# FrameRonin **V3** — 部署说明
+
+产品能力与版本说明见根目录 [README.md](./README.md)；功能扩展与已实现对照见 [DEV_PLAN_extensions.md](./DEV_PLAN_extensions.md)。
+
+![部署相关示意图](image/DEPLOY/1773816518080.png)
 
 ## 推送远程
 
